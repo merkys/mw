@@ -335,6 +335,9 @@ class CommitCommand(CommandBase):
                                help='mark actions as a bot (won\'t affect '
                                'anything if you don\'t have the bot right',
                                default=False)
+        self.parser.add_option('-w', '--watch', dest='watch',
+                               action='store_true',
+                               help='watch modified pages', default=False)
 
     def _do_command(self):
         self._die_if_no_init()
@@ -393,6 +396,8 @@ class CommitCommand(CommandBase):
                 }
                 if self.options.bot:
                     data['bot'] = 'bot'
+                if self.options.watch:
+                    data['watchlist'] = 'watch'
                 response = self.api.call(data)
                 if 'error' in response:
                     if 'code' in response['error']:
