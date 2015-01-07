@@ -247,7 +247,29 @@ class PullCommand(CommandBase):
                     data = response[pageid]['revisions'][0]['*']
                     data = data.encode('utf-8')
                     fd.write(data)
-                        
+
+
+class RevertCommand(CommandBase):
+
+    def __init__(self):
+        usage = 'FILES'
+        CommandBase.__init__(self, 'revert', 'revert pages', usage)
+
+    def _do_command(self):
+        self._die_if_no_init()
+        if self.args:
+            status = self.metadir.working_dir_status(self.args)
+            files_now = []
+            for filename,stat in status.iteritems():
+                if stat is not None:
+                    os.unlink(filename)
+                    files_now.append(filename)
+            if files_now:
+                pull_command = PullCommand()
+                pull_command.args = files_now
+                pull_command._do_command()
+
+
 class StatusCommand(CommandBase):
 
     def __init__(self):
