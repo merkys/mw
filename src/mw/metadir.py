@@ -54,7 +54,6 @@ class Metadir(object):
             fd.close()
             self.config = ConfigParser.RawConfigParser()
             self.config.read(self.config_loc)
-            self.pagedict_loaded = False
         else:
             self.config = None
 
@@ -80,13 +79,6 @@ class Metadir(object):
         self.config.add_section('merge')
         self.config.set('merge', 'tool', 'kidff3 %s %s -o %s')
         self.save_config()
-        # create cache/
-        os.mkdir(os.path.join(self.location, 'cache'))
-        # create cache/pagedict
-        fd = file(os.path.join(self.location, 'cache', 'pagedict'), 'w')
-        fd.write(json.dumps({}))
-        fd.close()
-
         # create pages/
         os.mkdir(os.path.join(self.location, 'pages'), 0755)
 
