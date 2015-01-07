@@ -242,7 +242,9 @@ class PullCommand(CommandBase):
                 self.metadir.set_content(pagename,
                                          response[pageid]['revisions'][0]['*'],
                                          last_wiki_rev_user,
-                                         last_wiki_revid)
+                                         last_wiki_revid,
+                                         os.path.relpath(full_filename,
+                                                         self.metadir.root))
                 with file(full_filename, 'w') as fd:
                     data = response[pageid]['revisions'][0]['*']
                     data = data.encode('utf-8')
@@ -299,7 +301,12 @@ class AddCommand(CommandBase):
         for filename,stat in status.iteritems():
             if stat == '?':
                 pagename = self.metadir.get_pagename_from_filename(filename)
-                self.metadir.set_content(pagename, '', '', None)
+                if os.path.exists(self.metadir.get_pagefile_from_pagename(pagename)):
+                    print 'warning: can not add %s, page with the same ' \
+                          'name exists -- skipping' % filename
+                    continue
+                self.metadir.set_content(pagename, '', '', None,
+                                         os.path.relpath(filename,self.metadir.root))
 
 
 class TouchCommand(CommandBase):
@@ -443,7 +450,8 @@ class CommitCommand(CommandBase):
                     self.metadir.set_content(pagename,
                                              response[pageid]['revisions'][0]['*'],
                                              response[pageid]['revisions'][0]['user'],
-                                             response[pageid]['revisions'][0]['revid'])
+                                             response[pageid]['revisions'][0]['revid'],
+                                             os.path.relpath(filename,self.metadir.root))
                     with file(filename, 'w') as fd:
                         data = response[pageid]['revisions'][0]['*']
                         data = data.encode('utf-8')

@@ -25,7 +25,7 @@ from StringIO import StringIO
 import sys
 import hashlib
 
-version = 'merkys/1'
+version = 'merkys/2'
 
 class Metadir(object):
 
@@ -121,13 +121,17 @@ class Metadir(object):
     def get_revision(self, pagename):
         return self.get_pagedata(pagename)['revision']
 
-    def set_content(self, pagename, content, author, revision):
+    def get_path(self, pagename):
+        return self.get_pagedata(pagename)['path']
+
+    def set_content(self, pagename, content, author, revision, path):
         pagefile = self.get_pagefile_from_pagename(pagename)
         fd = file(pagefile, 'w')
         fd.write(json.dumps({
             'content' : content,
             'author'  : author,
             'revision': revision,
+            'path'    : path,
             }))
         fd.truncate()
         fd.close()
@@ -151,9 +155,11 @@ class Metadir(object):
         return status
 
     def get_status_filename(self, filename):
-        if not os.path.exists(self.get_pagefile_from_filename(filename)):
+        pagename = self.get_pagename_from_filename(filename)
+        if not os.path.exists(self.get_pagefile_from_filename(filename)) or \
+            os.path.relpath(filename,self.root) != self.get_path(pagename):
             return '?' # not added
-        if self.get_revision(self.get_pagename_from_filename(filename)) is None:
+        if self.get_revision(pagename) is None:
             return 'A' # just added
         if self.diff_rv_to_working(filename) != '':
             return 'M' # modified
