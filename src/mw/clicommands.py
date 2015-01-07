@@ -171,7 +171,6 @@ class PullCategoryMembersCommand(CommandBase):
                  self._do_command()
 
 
-
 class PullCommand(CommandBase):
     
     def __init__(self):
@@ -188,12 +187,12 @@ class PullCommand(CommandBase):
         converted_pages = []
         if pages == []:
             pages = self.metadir.working_dir_status().keys()
-        for pagename in pages:
-            if '.wiki' in pagename:
+        for filename in pages:
+            if '.wiki' in filename:
                 converted_pages.append(
-                    mw.metadir.filename_to_pagename(pagename[:-5]))
+                    self.metadir.get_pagename_from_filename(filename))
             else:
-                converted_pages.append(pagename)
+                converted_pages.append(filename)
         pages = converted_pages
 
         # process the files in groups of 25 to be kind to service
@@ -223,11 +222,13 @@ class PullCommand(CommandBase):
                 
                 # check if working file is modified or if wiki page doesn't exists
                 status = self.metadir.working_dir_status()
-                filename = mw.metadir.pagename_to_filename(pagename)
-                full_filename = os.path.join(self.metadir.root, filename + '.wiki')
-                if filename + '.wiki' in status and \
-                    status[filename + '.wiki' ] in ['M']:
+                filename = self.metadir.get_filename_from_pagename(pagename)
+                full_filename = os.path.join(self.metadir.root, filename)
+                if filename in status and status[filename] in ['M']:
                     print 'skipping:       "%s" -- uncommitted modifications ' % (pagename)
+                    continue
+                if filename in status and status[filename] in ['A','?']:
+                    print 'skipping:       "%s" -- uncommitted file exists ' % (pagename)
                     continue
                 if 'missing' in response[pageid].keys():
                     print 'error:          "%s": -- page does not exist, file not created' % \
@@ -236,22 +237,16 @@ class PullCommand(CommandBase):
 
                 wiki_revids = sorted([x['revid'] for x in response[pageid]['revisions']])
                 last_wiki_revid = wiki_revids[-1]
-                working_revids = sorted(self.metadir.pages_get_rv_list({'id' : pageid}))
-                last_working_revid = working_revids[-1]
-                if ( os.path.exists(full_filename) and 
-                        last_wiki_revid == last_working_revid):
-                    #print 'wiki unchanged: "%s"' % (pagename)
-                    pass
-                else:
-                    print 'pulling:        "%s" : "%s" by "%s"' % (
-                        pagename, last_wiki_rev_comment, last_wiki_rev_user)
-                    self.metadir.pagedict_add(pagename, pageid, last_wiki_revid)
-                    self.metadir.pages_add_rv(int(pageid),
-                                              response[pageid]['revisions'][0])
-                    with file(full_filename, 'w') as fd:
-                        data = response[pageid]['revisions'][0]['*']
-                        data = data.encode('utf-8')
-                        fd.write(data)
+                print 'pulling:        "%s" : "%s" by "%s"' % (
+                    pagename, last_wiki_rev_comment, last_wiki_rev_user)
+                self.metadir.set_content(pagename,
+                                         response[pageid]['revisions'][0]['*'],
+                                         last_wiki_rev_user,
+                                         last_wiki_revid)
+                with file(full_filename, 'w') as fd:
+                    data = response[pageid]['revisions'][0]['*']
+                    data = data.encode('utf-8')
+                    fd.write(data)
                         
 class StatusCommand(CommandBase):
 
@@ -265,12 +260,24 @@ class StatusCommand(CommandBase):
     def _do_command(self):
         self._die_if_no_init()
         status = self.metadir.working_dir_status()
-        for filename in status:
+        for filename,stat in status.iteritems():
+            if stat is not None:
+                print '%s %s' % (stat, filename)
 
-            if not self.options.show_all and status[filename] == 'C':
-                continue
-            else:
-                print '%s %s' % (status[filename], filename)
+
+class AddCommand(CommandBase):
+
+    def __init__(self):
+        usage = 'FILES'
+        CommandBase.__init__(self, 'add', 'add a wiki page', usage)
+
+    def _do_command(self):
+        self._die_if_no_init()
+        status = self.metadir.working_dir_status()
+        for filename,stat in status.iteritems():
+            if stat == '?':
+                pagename = self.metadir.get_pagename_from_filename(filename)
+                self.metadir.set_content(pagename, '', '', None)
 
 
 class DiffCommand(CommandBase):
@@ -281,10 +288,9 @@ class DiffCommand(CommandBase):
     def _do_command(self):
         self._die_if_no_init()
         status = self.metadir.working_dir_status()
-        for filename in status:
-            if status[filename] == 'M':
-                print self.metadir.diff_rv_to_working(
-                        mw.metadir.filename_to_pagename(filename[:-5])),
+        for filename,stat in status.iteritems():
+            if stat in ['M']:
+                print self.metadir.diff_rv_to_working(filename)
 
 
 class MergeCommand(CommandBase):
@@ -344,9 +350,9 @@ class CommitCommand(CommandBase):
         self._api_setup()
         files_to_commit = 0 # how many files to process
         status = self.metadir.working_dir_status(files=self.args)
-        for filename in status:
-            if status[filename] in ['M']:
-                print '%s %s' % (status[filename], filename)
+        for filename,stat in status.iteritems():
+            if stat in ['A','M']:
+                print '%s %s' % (stat, filename)
                 files_to_commit += 1
         if not files_to_commit:
             print 'nothing to commit'
@@ -356,8 +362,8 @@ class CommitCommand(CommandBase):
             edit_summary = raw_input()
         else:
             edit_summary = self.options.edit_summary
-        for filename in status:
-            if status[filename] in ['M']:
+        for filename,stat in status.iteritems():
+            if stat in ['A','M']:
                 start_time = time.time()
                 files_to_commit -= 1
                 # get edit token
@@ -365,18 +371,19 @@ class CommitCommand(CommandBase):
                         'action': 'query',
                         'prop': 'info|revisions',
                         'intoken': 'edit',
-                        'titles': mw.metadir.filename_to_pagename(filename[:-5]),
+                        'titles': self.metadir.get_pagename_from_filename(filename),
                 }
                 response = self.api.call(data)
                 pages = response['query']['pages']
                 pageid = pages.keys()[0]
-                revid = pages[pageid]['revisions'][0]['revid']
-                awaitedrevid = \
-                        self.metadir.pages_get_rv_list({'id': pageid})[0]
-                if revid != awaitedrevid:
-                    print 'warning: edit conflict detected on "%s" (%s -> %s) ' \
-                            '-- skipping! (try merge)' % (filename, awaitedrevid, revid)
-                    continue
+                if stat in ['M']:
+                    revid = pages[pageid]['revisions'][0]['revid']
+                    awaitedrevid = \
+                        self.metadir.get_revision(self.metadir.get_pagename_from_filename(filename))
+                    if revid != awaitedrevid:
+                        print 'warning: edit conflict detected on "%s" (%s -> %s) ' \
+                                '-- skipping! (try merge)' % (filename, awaitedrevid, revid)
+                        continue
                 edittoken = pages[pageid]['edittoken']
                 full_filename = os.path.join(self.metadir.root, filename)
                 text = codecs.open(full_filename, 'r', 'utf-8').read()
@@ -388,7 +395,7 @@ class CommitCommand(CommandBase):
                 textmd5 = md5.hexdigest()
                 data = {
                         'action': 'edit',
-                        'title': mw.metadir.filename_to_pagename(filename[:-5]),
+                        'title': self.metadir.get_pagename_from_filename(filename),
                         'token': edittoken,
                         'text': text,
                         'md5': textmd5,
@@ -408,10 +415,9 @@ class CommitCommand(CommandBase):
                     if 'nochange' in response['edit']:
                         print 'warning: no changes detected in %s - ' \
                                 'skipping and removing ending LF' % filename
-                        pagename = mw.metadir.filename_to_pagename(filename[:-5])
-                        self.metadir.clean_page(pagename)
+                        self.metadir.clean_page(filename)
                         continue
-                    if response['edit']['oldrevid'] != revid:
+                    if stat in ['M'] and response['edit']['oldrevid'] != revid:
                         print 'warning: edit conflict detected on %s (%s -> %s) ' \
                                 '-- skipping!' % (file, 
                                 response['edit']['oldrevid'], revid)
@@ -424,18 +430,22 @@ class CommitCommand(CommandBase):
                                     'ids|flags|timestamp|user|comment|content',
                     }
                     response = self.api.call(data)['query']['pages']
-                    self.metadir.pages_add_rv(int(pageid),
-                                              response[pageid]['revisions'][0])
+                    pageid = response.keys()[0]
                     # need to write latest rev to file too, as text may be changed
                     #such as a sig, e.g., -~ =>  -[[User:Reagle|Reagle]]
-                    with file(full_filename, 'w') as fd:
+                    pagename = self.metadir.get_pagename_from_filename(filename)
+                    self.metadir.set_content(pagename,
+                                             response[pageid]['revisions'][0]['*'],
+                                             response[pageid]['revisions'][0]['user'],
+                                             response[pageid]['revisions'][0]['revid'])
+                    with file(filename, 'w') as fd:
                         data = response[pageid]['revisions'][0]['*']
                         data = data.encode('utf-8')
                         fd.write(data)
                     if files_to_commit :
                         end_time = time.time()
                         print time.strftime("%Y-%m-%d - %H:%M:%S", time.gmtime(time.time())) \
-                            + " - Committed - " + mw.metadir.filename_to_pagename(filename[:-5]) \
+                            + " - Committed - " + self.metadir.filename_to_pagename(filename[:-5]) \
                             + " - Files left: " + str(files_to_commit)
                         time_inc = end_time - start_time
                         delay = 10 - time_inc

@@ -25,6 +25,7 @@ from StringIO import StringIO
 import sys
 import hashlib
 
+version = 'merkys/1'
 
 class Metadir(object):
 
@@ -42,16 +43,17 @@ class Metadir(object):
             root = head
         self.location = os.path.join(self.root, '.mw')
         self.config_loc = os.path.join(self.location, 'config')
+        self.version_loc = os.path.join(self.location, 'version')
         if os.path.isdir(self.location) and \
-           os.path.isfile(self.config_loc):
+           os.path.isfile(self.config_loc) and \
+           os.path.isfile(self.version_loc):
+            fd = file(self.version_loc, 'r+')
+            if fd.read() != version:
+                print '%s: mw repo is incompatible' % self.me
+                sys.exit(1)
+            fd.close()
             self.config = ConfigParser.RawConfigParser()
             self.config.read(self.config_loc)
-            self.use_md5 = False
-            if self.config.has_option('index', 'use_md5'):
-                self.use_md5 = ( self.config.get('index', 'use_md5') == 'on' )
-                md5path = os.path.join(self.location, 'cache', 'md5index')
-                if self.use_md5 and not  os.path.exists(md5path):
-                    os.mkdir(md5path, 0755)
             self.pagedict_loaded = False
         else:
             self.config = None
@@ -69,7 +71,7 @@ class Metadir(object):
             os.mkdir(self.location, 0755)
         # metadir versioning
         fd = file(os.path.join(self.location, 'version'), 'w')
-        fd.write('1')  # XXX THIS API VERSION NOT LOCKED IN YET
+        fd.write(version)  # XXX THIS API VERSION NOT LOCKED IN YET
         fd.close()
         # create config
         self.config = ConfigParser.RawConfigParser()
@@ -77,8 +79,6 @@ class Metadir(object):
         self.config.set('remote', 'api_url', api_url)
         self.config.add_section('merge')
         self.config.set('merge', 'tool', 'kidff3 %s %s -o %s')
-        self.config.add_section('index')
-        self.config.set('index', 'use_md5','on')
         self.save_config()
         # create cache/
         os.mkdir(os.path.join(self.location, 'cache'))
@@ -87,15 +87,13 @@ class Metadir(object):
         fd.write(json.dumps({}))
         fd.close()
 
-        # structure replacement for pagedict
-        # will also be created if use_md5 is turned on with an existing project
-        os.mkdir(os.path.join(self.location, 'cache', 'md5index'), 0755)
+        # create pages/
+        os.mkdir(os.path.join(self.location, 'pages'), 0755)
 
-        # create cache/pages/
-        os.mkdir(os.path.join(self.location, 'cache', 'pages'), 0755)
-
-    def clean_page(self, pagename):
-        filename = pagename_to_filename(pagename) + '.wiki'
+    def clean_page(self, filename):
+        """
+        Seems to remove the trailing newline from the page.
+        """
         cur_content = codecs.open(filename, 'r', 'utf-8').read()
         if len(cur_content) != 0 and cur_content[-1] == '\n':
             cur_content = cur_content[:-1]
@@ -103,95 +101,47 @@ class Metadir(object):
         fd.write(cur_content.encode('utf-8'))
         fd.close()
 
-    def pagedict_load(self):
-        if not self.pagedict_loaded:
-            fd = file(os.path.join(self.location, 'cache', 'pagedict'), 'r+')
-            self.pagedict = json.loads(fd.read())
-            fd.close
-            self.pagedict_loaded = True
+    def get_pagefile_from_pagename(self, pagename):
+        return os.path.join(self.location, 'pages',
+                            pagename_to_filename(pagename) + '.wiki')
 
-    def get_md5_from_pagename(self, pagename):
-        m = hashlib.md5()
-        name = pagename.encode('unicode_escape') 
-        m.update(name)
-        return os.path.join(self.location, 'cache', 'md5index', m.hexdigest())
+    def get_pagename_from_filename(self, filename):
+        name = os.path.split(filename)[1]
+        return filename_to_pagename(name)[:-5]
 
-    def pagedict_add(self, pagename, pageid, currentrv):
-        if not self.use_md5:
-            self.pagedict_load()
-            self.pagedict[pagename] = {'id': int(pageid), 'currentrv': int(currentrv)}
-            fd = file(os.path.join(self.location, 'cache', 'pagedict'), 'w')
-            fd.write(json.dumps(self.pagedict))
-            fd.truncate()
-            fd.close()
-        else: # feeding the new index structure
-             md5pagename = self.get_md5_from_pagename(pagename)
-             page = {}
-             page[pagename] =  {'id': int(pageid), 'currentrv': int(currentrv)}
-             fd = file(md5pagename , 'w')
-             fd.write(json.dumps(page))
-             fd.truncate()
-             fd.close()
+    def get_pagefile_from_filename(self, filename):
+        pagename = self.get_pagename_from_filename(filename)
+        return self.get_pagefile_from_pagename(pagename)
 
-    def get_pageid_from_pagename(self, pagename):
-        if not self.use_md5:
-             self.pagedict_load()
-             pagename = pagename.decode('utf-8')
-             if pagename in self.pagedict.keys():
-                 return self.pagedict[pagename]
-             else:
-                 return None
-        else: # feeding the new index structure
-             pagename = pagename.decode('utf-8')
-             md5pagename = self.get_md5_from_pagename(pagename)
-             if os.path.isfile(md5pagename):
-                 fd = file(md5pagename, 'r+')
-                 page = json.loads(fd.read())
-                 return page[pagename]
-             else:
-                 return None
+    def get_filename_from_pagename(self, pagename):
+        return pagename_to_filename(pagename) + '.wiki'
 
-    def pages_add_rv(self, pageid, rv):
-        pagefile = os.path.join(self.location, 'cache', 'pages', str(pageid))
-        fd = file(pagefile, 'w+')
-        pagedata_raw = fd.read()
-        if pagedata_raw == '':
-            pagedata = {}
-        else:
-            pagedata = json.loads(pagedata_raw)
-        rvid = int(rv['revid'])
-        pagedata[rvid] = {
-                'user': rv['user'],
-                'timestamp': rv['timestamp'],
-        }
-        if '*' in rv.keys():
-            pagedata[rvid]['content'] = rv['*']
-        fd.seek(0)
-        fd.write(json.dumps(pagedata))
+    def get_conflictpath_from_filename(self, filename):
+        return filename[:-5] + ".mine"
+
+    def get_pagedata(self, pagename):
+        fd = file(self.get_pagefile_from_pagename(pagename),'r')
+        return json.loads(fd.read())
+
+    def get_content(self, pagename):
+        return self.get_pagedata(pagename)['content']
+
+    def get_author(self, pagename):
+        return self.get_pagedata(pagename)['author']
+
+    def get_revision(self, pagename):
+        return self.get_pagedata(pagename)['revision']
+
+    def set_content(self, pagename, content, author, revision):
+        pagefile = self.get_pagefile_from_pagename(pagename)
+        fd = file(pagefile, 'w')
+        fd.write(json.dumps({
+            'content' : content,
+            'author'  : author,
+            'revision': revision,
+            }))
         fd.truncate()
         fd.close()
-
-    def pages_get_rv_list(self, pageid):
-        pagefile = os.path.join(self.location, 'cache', 'pages',
-                                str(pageid['id']))
-        if os.path.exists(pagefile):
-            fd = file(pagefile, 'r')
-            pagedata = json.loads(fd.read())
-            rvs = [int(x) for x in pagedata.keys()]
-            rvs.sort()
-            return rvs
-        else:
-            return [None,]
-
-    def pages_get_rv(self, pageid, rvid):
-        pagefile = os.path.join(self.location, 'cache', 'pages',
-                                str(pageid['id']))
-        if os.path.exists(pagefile):
-            fd = file(pagefile, 'r')
-            pagedata = json.loads(fd.read())
-            return pagedata[str(rvid)]
-        else:
-            return None
             
     def working_dir_status(self, files=None):
         status = {}
@@ -206,57 +156,46 @@ class Metadir(object):
             for file in files:
                 check.append(os.path.join(os.getcwd(), file))
         check.sort()
-        for full in check:
-            name = os.path.split(full)[1]
-            if name[-5:] == '.wiki':
-                pagename = filename_to_pagename(name[:-5])
-                pageid = self.get_pageid_from_pagename(pagename)
-                if not pageid:
-                    status[os.path.relpath(full, self.root)] = '?'
-                else:
-                    rvid = self.pages_get_rv_list(pageid)[-1]
-                    rv = self.pages_get_rv(pageid, rvid)
-                    cur_content = codecs.open(full, 'r', 'utf-8').read()
-                    if (len(cur_content) != 0) and (cur_content[-1] == '\n'):
-                        cur_content = cur_content[:-1]
-                    if cur_content != rv['content']:
-                        status[os.path.relpath(full, self.root)] = 'M' # modified
-                    else:
-                        status[os.path.relpath(full, self.root)] = 'C' # clean
+        for filename in check:
+            if filename.endswith('.wiki'):
+                status[filename] = self.get_status_filename(filename)
         return status
 
-    def diff_rv_to_working(self, pagename, oldrvid=0, newrvid=0):
-        # oldrvid=0 means latest fetched revision
-        # newrvid=0 means working copy
-        filename = pagename_to_filename(pagename) + '.wiki'
-        filename = filename.decode('utf-8')
-        pageid = self.get_pageid_from_pagename(pagename)
-        if not pageid:
-            raise ValueError('page named %s has not been fetched' % pagename)
+    def get_status_filename(self, filename):
+        if not os.path.exists(self.get_pagefile_from_filename(filename)):
+            return '?' # not added
+        if os.path.exists(self.get_conflictpath_from_filename(filename)):
+            return 'C' # conflict
+        if self.get_revision(self.get_pagename_from_filename(filename)) is None:
+            return 'A' # just added
+        if self.diff_rv_to_working(filename) != '':
+            return 'M' # modified
         else:
-            if oldrvid == 0:
-                oldrvid = self.pages_get_rv_list(pageid)[-1]
-            oldrv = self.pages_get_rv(pageid, oldrvid)
-            oldname = 'a/%s (revision %i)' % (filename, oldrvid)
-            old = [i + '\n' for i in \
-                   oldrv['content'].encode('utf-8').split('\n')]
-            if newrvid == 0:
-                cur_content = codecs.open(filename, 'r', 'utf-8').read()
-                cur_content = cur_content.encode('utf-8')
-                if (len(cur_content) != 0) and (cur_content[-1] == '\n'):
-                    cur_content = cur_content[:-1]
-                newname = 'b/%s (working copy)' % filename
-                new = [i + '\n' for i in cur_content.split('\n')]
-            else:
-                newrv = self.pages_get_rv(pageid, newrvid)
-                newname = 'b/%s (revision %i)' % (filename, newrvid)
-                new = [i + '\n' for i in newrv['content'].split('\n')]
-            diff_fd = StringIO()
-            bzrlib.diff.internal_diff(oldname, old, newname, new, diff_fd)
-            diff = diff_fd.getvalue()
-            if diff[-1] == '\n':
-                diff = diff[:-1]
-            return diff
+            return None
+
+    def diff_rv_to_working(self, filename):
+        pagename = self.get_pagename_from_filename(filename)
+        old_content = self.get_content(pagename)
+        oldrev = self.get_revision(pagename)
+        oldname = ''
+        if oldrev is not None:
+            oldname = 'a/%s (revision %i)' % (pagename, oldrev)
+        else:
+            oldname = 'a/%s (uncommitted)' % (pagename)
+        old = [i + '\n' for i in \
+                   old_content.encode('utf-8').split('\n')]
+        cur_content = codecs.open(filename, 'r', 'utf-8').read()
+        cur_content = cur_content.encode('utf-8')
+        if (len(cur_content) != 0) and (cur_content[-1] == '\n'):
+            cur_content = cur_content[:-1]
+        newname = 'b/%s (working copy)' % pagename
+        new = [i + '\n' for i in cur_content.split('\n')]
+        diff_fd = StringIO()
+        bzrlib.diff.internal_diff(oldname, old, newname, new, diff_fd)
+        diff = diff_fd.getvalue()
+        if diff and diff[-1] == '\n':
+            diff = diff[:-1]
+        return diff
 
 
 def pagename_to_filename(name):
