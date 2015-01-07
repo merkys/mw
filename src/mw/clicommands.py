@@ -302,6 +302,25 @@ class AddCommand(CommandBase):
                 self.metadir.set_content(pagename, '', '', None)
 
 
+class TouchCommand(CommandBase):
+
+    def __init__(self):
+        usage = 'PAGENAMES'
+        CommandBase.__init__(self, 'touch',
+                             'create files for pages and add them', usage)
+
+    def _do_command(self):
+        self._die_if_no_init()
+        for pagename in self.args:
+            filename = mw.metadir.pagename_to_filename(pagename) + '.wiki'
+            if not os.path.exists(filename):
+                with file(filename, 'w') as fd:
+                    fd.write("")
+            add_command = AddCommand()
+            add_command.args = [filename]
+            add_command._do_command()
+
+
 class DiffCommand(CommandBase):
 
     def __init__(self):

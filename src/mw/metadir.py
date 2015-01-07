@@ -208,3 +208,10 @@ def filename_to_pagename(name):
     name = name.replace('!', '/')
     name = name.replace('_', ' ')
     return name
+
+def any_to_pagename(name):
+    if name.endswith('.wiki'):
+        name = os.path.split(name[:-5])[1]
+        return filename_to_pagename(name)
+    else:
+        return name
