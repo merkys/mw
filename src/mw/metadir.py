@@ -116,9 +116,6 @@ class Metadir(object):
     def get_filename_from_pagename(self, pagename):
         return pagename_to_filename(pagename) + '.wiki'
 
-    def get_conflictpath_from_filename(self, filename):
-        return filename[:-5] + ".mine"
-
     def get_pagedata(self, pagename):
         fd = file(self.get_pagefile_from_pagename(pagename),'r')
         return json.loads(fd.read())
@@ -164,8 +161,6 @@ class Metadir(object):
     def get_status_filename(self, filename):
         if not os.path.exists(self.get_pagefile_from_filename(filename)):
             return '?' # not added
-        if os.path.exists(self.get_conflictpath_from_filename(filename)):
-            return 'C' # conflict
         if self.get_revision(self.get_pagename_from_filename(filename)) is None:
             return 'A' # just added
         if self.diff_rv_to_working(filename) != '':
@@ -202,7 +197,6 @@ def pagename_to_filename(name):
     name = name.replace(' ', '_')
     name = name.replace('/', '!')
     return name
-
 
 def filename_to_pagename(name):
     name = name.replace('!', '/')

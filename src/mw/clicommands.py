@@ -334,41 +334,6 @@ class DiffCommand(CommandBase):
                 print self.metadir.diff_rv_to_working(filename)
 
 
-class MergeCommand(CommandBase):
-    def __init__(self):
-        usage = '[FILES]'
-        CommandBase.__init__(self, 'merge', 'merge local and wiki copies', usage)
-
-    def _do_command(self):
-        self._die_if_no_init()
-        self.merge_tool = self.metadir.config.get('merge', 'tool')
-        status = self.metadir.working_dir_status()
-        for filename in status:
-            if status[filename] == 'M':
-                full_filename = os.path.join(self.metadir.root, filename)
-                pagename = mw.metadir.filename_to_pagename(filename[:-5])
-                # mv local to filename.wiki.local
-                os.rename(full_filename, full_filename + '.local')
-                # pull wiki copy
-                pull_command = PullCommand()
-                pull_command.args = [pagename]#.encode('utf-8')] #assuming the file is already using utf-8 - esby
-                pull_command._do_command()
-                # mv remote to filename.wiki.remote
-                os.rename(full_filename, full_filename + '.remote')
-                # Open merge tool
-                merge_command = self.merge_tool % (full_filename + '.local', 
-                    full_filename + '.remote', full_filename + '.merge')
-                subprocess.call(merge_command.split(' '))
-                # mv filename.merge filename and delete tmp files
-                os.rename(full_filename + '.merge', full_filename)
-                os.remove(full_filename + '.local')
-                os.remove(full_filename + '.remote')
-                # mw ci pagename
-                commit_command = CommitCommand()
-                commit_command.args = [pagename]#.encode('utf-8')] #assuming the file is already using utf-8 - esby
-                commit_command._do_command()
-
-
 class CommitCommand(CommandBase):
 
     def __init__(self):
@@ -417,13 +382,13 @@ class CommitCommand(CommandBase):
                 response = self.api.call(data)
                 pages = response['query']['pages']
                 pageid = pages.keys()[0]
-                if stat in ['M']:
+                if stat in ['M'] or pageid in pages.keys():
                     revid = pages[pageid]['revisions'][0]['revid']
                     awaitedrevid = \
                         self.metadir.get_revision(self.metadir.get_pagename_from_filename(filename))
                     if revid != awaitedrevid:
                         print 'warning: edit conflict detected on "%s" (%s -> %s) ' \
-                                '-- skipping! (try merge)' % (filename, awaitedrevid, revid)
+                                '-- skipping! (try pull first)' % (filename, awaitedrevid, revid)
                         continue
                 edittoken = pages[pageid]['edittoken']
                 full_filename = os.path.join(self.metadir.root, filename)
