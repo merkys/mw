@@ -224,10 +224,10 @@ class PullCommand(CommandBase):
                 status = self.metadir.working_dir_status()
                 filename = self.metadir.get_filename_from_pagename(pagename)
                 full_filename = os.path.join(self.metadir.root, filename)
-                if filename in status and status[filename] in ['M']:
+                if full_filename in status and status[full_filename] in ['M']:
                     print 'skipping:       "%s" -- uncommitted modifications ' % (pagename)
                     continue
-                if filename in status and status[filename] in ['A','?']:
+                if full_filename in status and status[full_filename] in ['A','?']:
                     print 'skipping:       "%s" -- uncommitted file exists ' % (pagename)
                     continue
                 if 'missing' in response[pageid].keys():
