@@ -284,7 +284,7 @@ class StatusCommand(CommandBase):
         status = self.metadir.working_dir_status()
         for filename,stat in status.iteritems():
             if stat is not None:
-                print '%s %s' % (stat, filename)
+                print '%s %s' % (stat, os.path.relpath(filename))
 
 
 class AddCommand(CommandBase):
