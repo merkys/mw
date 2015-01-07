@@ -264,7 +264,8 @@ class RevertCommand(CommandBase):
             files_now = []
             for filename,stat in status.iteritems():
                 if stat is not None:
-                    os.unlink(filename)
+                    if stat not in ['!']:
+                        os.unlink(filename)
                     files_now.append(filename)
             if files_now:
                 pull_command = PullCommand()
@@ -284,7 +285,8 @@ class StatusCommand(CommandBase):
     def _do_command(self):
         self._die_if_no_init()
         status = self.metadir.working_dir_status()
-        for filename,stat in status.iteritems():
+        for filename in sorted(status.keys()):
+            stat = status[filename]
             if stat is not None:
                 print '%s %s' % (stat, os.path.relpath(filename))
 
@@ -307,6 +309,21 @@ class AddCommand(CommandBase):
                     continue
                 self.metadir.set_content(pagename, '', '', None,
                                          os.path.relpath(filename,self.metadir.root))
+
+
+class CleanCommand(CommandBase):
+ 
+    def __init__(self):
+        CommandBase.__init__(self, 'clean', 'remove metadata of deleted pages')
+
+    def _do_command(self):
+        self._die_if_no_init()
+        status = self.metadir.working_dir_status()
+        for filename,stat in status.iteritems():
+            if stat == '!':
+                pagename = self.metadir.get_pagename_from_filename(filename)
+                pagefile = self.metadir.get_pagefile_from_pagename(pagename)
+                os.unlink(pagefile)
 
 
 class TouchCommand(CommandBase):

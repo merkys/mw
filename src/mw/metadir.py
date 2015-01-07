@@ -144,11 +144,19 @@ class Metadir(object):
                 if root == self.root:
                     dirs.remove('.mw')
                 for name in files:
-                    check.append(os.path.join(root, name))
+                    if name.endswith('.wiki'):
+                        check.append(os.path.join(root, name))
+            for root, dirs, files in os.walk(os.path.join(self.location,
+                                                          'pages')):
+                for name in files:
+                    if name.endswith('.wiki'):
+                        pagename = self.get_pagename_from_filename(name)
+                        check.append(os.path.join(self.root,
+                                                  self.get_path(pagename)))
         else:
             for file in files:
                 check.append(os.path.join(os.getcwd(), file))
-        check.sort()
+        check = list(set(check))
         for filename in check:
             if filename.endswith('.wiki'):
                 status[filename] = self.get_status_filename(filename)
@@ -156,9 +164,13 @@ class Metadir(object):
 
     def get_status_filename(self, filename):
         pagename = self.get_pagename_from_filename(filename)
-        if not os.path.exists(self.get_pagefile_from_filename(filename)) or \
-            os.path.relpath(filename,self.root) != self.get_path(pagename):
+        if not os.path.exists(self.get_pagefile_from_filename(filename)):
             return '?' # not added
+        else:
+            if not os.path.exists(filename):
+                return '!' # file is deleted
+            if os.path.relpath(filename,self.root) != self.get_path(pagename):
+                return '?' # added, but not this page
         if self.get_revision(pagename) is None:
             return 'A' # just added
         if self.diff_rv_to_working(filename) != '':
