@@ -406,7 +406,7 @@ class CommitCommand(CommandBase):
                 response = self.api.call(data)
                 pages = response['query']['pages']
                 pageid = pages.keys()[0]
-                if stat in ['M'] or pageid in pages.keys():
+                if stat in ['M']:
                     revid = pages[pageid]['revisions'][0]['revid']
                     awaitedrevid = \
                         self.metadir.get_revision(self.metadir.get_pagename_from_filename(filename))
@@ -476,7 +476,7 @@ class CommitCommand(CommandBase):
                     if files_to_commit :
                         end_time = time.time()
                         print time.strftime("%Y-%m-%d - %H:%M:%S", time.gmtime(time.time())) \
-                            + " - Committed - " + self.metadir.filename_to_pagename(filename[:-5]) \
+                            + " - Committed - " + self.metadir.get_pagename_from_filename(filename) \
                             + " - Files left: " + str(files_to_commit)
                         time_inc = end_time - start_time
                         delay = 10 - time_inc
