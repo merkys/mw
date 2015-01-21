@@ -144,6 +144,7 @@ class Metadir(object):
                 if root == self.root:
                     dirs.remove('.mw')
                 for name in files:
+                    name = name.decode('utf-8')
                     if name.endswith('.wiki'):
                         check.append(os.path.join(root, name))
             for root, dirs, files in os.walk(os.path.join(self.location,
