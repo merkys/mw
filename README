@@ -25,22 +25,25 @@ mw status
 
 usage: mw [subcommand]
 
-        commit (ci)    commit changes to wiki   
+        add            add a wiki page
+        clean          remove metadata of deleted pages
+        commit (ci)    commit changes to wiki
         diff           diff wiki to working directory
-        init           start a mw repo          
-        login          authenticate with wiki   
-        logout         forget authentication    
-        merge          run merge tool on conflicting locate/remove diffs
-        pull           add remote pages to repo 
+        init           start a mw repo
+        login          authenticate with wiki
+        logout         forget authentication
+        pull           add remote pages to repo
         pullcat        add remote pages to repo belonging to the given category
-        status (st)    check repo status     
+        status (st)    check repo status
+        touch          create files for given page names and add them
 
 For a brief tutorial, see:
   http://reagle.org/joseph/2011/01/mw-tutorial
 
 === Status command ===
 
-`status` Will show whether a file has been locally modified ('M') or is clean ('C').
+`status` Will show whether a file has been added ('A'), locally modified
+  ('M') or missing ('!').
 
 === Pull command ===
 
