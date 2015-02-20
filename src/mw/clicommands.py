@@ -130,7 +130,7 @@ class PullCategoryMembersCommand(CommandBase):
 
     def __init__(self):
         usage = '[options] PAGENAME ...'
-        CommandBase.__init__(self, 'pull_commandat', 'add remote pages to repo '
+        CommandBase.__init__(self, 'pullcat', 'add remote pages to repo '
                              'belonging to the given category', usage)
         self.query_continue = ''
 
@@ -331,7 +331,7 @@ class TouchCommand(CommandBase):
     def __init__(self):
         usage = 'PAGENAMES'
         CommandBase.__init__(self, 'touch',
-                             'create files for pages and add them', usage)
+                             'create files for given page names and add them', usage)
 
     def _do_command(self):
         self._die_if_no_init()
