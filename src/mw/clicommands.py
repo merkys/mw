@@ -533,3 +533,58 @@ class WbcreateclaimCommand(CommandBase):
                 print 'error: %s' % response['error']['info']
             else:
                 print 'error: %s' % response
+        if 'success' in response:
+            if 'claim' in response:
+                if 'id' in response['claim']:
+                    print 'success: %s' % response['claim']['id']
+
+
+class Wbsetqualifier(CommandBase):
+
+    def __init__(self):
+        CommandBase.__init__(self, 'wbsetqualifier', 'set qualifier for claim')
+        self.parser.add_option('-c', '--claim', dest='claim',
+                               help='a claim (target) for qualifier')
+        self.parser.add_option('-p', '--property', dest='property',
+                               help='a property of a claim')
+        self.parser.add_option('-v', '--value', dest='value',
+                               help='a value for the claim')
+        self.parser.add_option('-b', '--bot', dest='bot', action='store_true',
+                               help='mark actions as a bot (won\'t affect '
+                               'anything if you don\'t have the bot right',
+                               default=False)
+
+    def _do_command(self):
+        self._die_if_no_init()
+        self._api_setup()
+        # get edit token
+        data = {
+                'action': 'query',
+                'prop': 'info|revisions',
+                'intoken': 'edit',
+                'titles': self.options.claim,
+               }
+        response = self.api.call(data)
+        pages = response['query']['pages']
+        pageid = pages.keys()[0]
+        edittoken = pages[pageid]['edittoken']
+        data = {
+                'action': 'wbsetqualifier',
+                'claim': self.options.claim,
+                'property': self.options.property,
+                'token': edittoken,
+                'snaktype': 'value',
+                'value': self.options.value,
+        }
+        if self.options.bot:
+            data['bot'] = 'bot'
+        response = self.api.call(data)
+        if 'error' in response:
+            if 'info' in response['error']:
+                print 'error: %s' % response['error']['info']
+            else:
+                print 'error: %s' % response
+        if 'success' in response:
+            if 'claim' in response:
+                if 'id' in response['claim']:
+                    print 'success: %s' % response['claim']['id']
