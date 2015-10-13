@@ -58,8 +58,10 @@ class Metadir(object):
             self.config = None
 
     def save_config(self):
+        oldmask = os.umask(0077)
         with open(self.config_loc, 'wb') as config_file:
             self.config.write(config_file)
+        os.umask(oldmask)
 
     def create(self, api_url):
         # create the directory
@@ -67,7 +69,7 @@ class Metadir(object):
             print '%s: you are already in a mw repo' % self.me
             sys.exit(1)
         else:
-            os.mkdir(self.location, 0755)
+            os.mkdir(self.location, 0700)
         # metadir versioning
         fd = file(os.path.join(self.location, 'version'), 'w')
         fd.write(version)  # XXX THIS API VERSION NOT LOCKED IN YET
