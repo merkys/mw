@@ -486,3 +486,50 @@ class CommitCommand(CommandBase):
                 else:
                     print 'error: committing %s failed: %s' % \
                             (filename, response['edit']['result'])
+
+
+class WbcreateclaimCommand(CommandBase):
+
+    def __init__(self):
+        CommandBase.__init__(self, 'wbcreateclaim', 'create claim for wikidata')
+        self.parser.add_option('-q', '--entity', dest='entity',
+                               help='an entity (target) for new claim')
+        self.parser.add_option('-p', '--property', dest='property',
+                               help='a property of a claim')
+        self.parser.add_option('-v', '--value', dest='value',
+                               help='a value for the claim')
+        self.parser.add_option('-b', '--bot', dest='bot', action='store_true',
+                               help='mark actions as a bot (won\'t affect '
+                               'anything if you don\'t have the bot right',
+                               default=False)
+
+    def _do_command(self):
+        self._die_if_no_init()
+        self._api_setup()
+        # get edit token
+        data = {
+                'action': 'query',
+                'prop': 'info|revisions',
+                'intoken': 'edit',
+                'titles': self.options.entity,
+               }
+        response = self.api.call(data)
+        pages = response['query']['pages']
+        pageid = pages.keys()[0]
+        edittoken = pages[pageid]['edittoken']
+        data = {
+                'action': 'wbcreateclaim',
+                'entity': self.options.entity,
+                'property': self.options.property,
+                'token': edittoken,
+                'snaktype': 'value',
+                'value': self.options.value,
+        }
+        if self.options.bot:
+            data['bot'] = 'bot'
+        response = self.api.call(data)
+        if 'error' in response:
+            if 'info' in response['error']:
+                print 'error: %s' % response['error']['info']
+            else:
+                print 'error: %s' % response
