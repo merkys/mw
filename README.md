@@ -1,8 +1,8 @@
-mw - VCS-like nonsense for MediaWiki websites
-Copyright (C) 2011  Ian Weller <ian@ianweller.org> and others
+mw &mdash; VCS-like nonsense for MediaWiki websites
+Copyright (C) 2011 Ian Weller <ian@ianweller.org> and others
 
-
-== Setup ==
+Setup
+=====
 
 You can install mw with the setup.py.
 
@@ -12,17 +12,22 @@ This package is dependent upon python-simplemediawiki:
 Also, the default merge tool is `kdiff3`, you can change this in your
 .mw/config after initialization.
 
-== Basic workflow ==
+Basic workflow
+==============
 
+```
 mw init http://example.com/w/api.php
 mw login  # if you need/want to
 mw pull 'Main Page'
 $EDITOR Main_Page.wiki
 mw commit
 mw status
+```
 
-== Commands ==
+Commands
+========
 
+```
 usage: mw [subcommand]
 
         add            add a wiki page
@@ -36,16 +41,19 @@ usage: mw [subcommand]
         pullcat        add remote pages to repo belonging to the given category
         status (st)    check repo status
         touch          create files for given page names and add them
+```
 
 For a brief tutorial, see:
   http://reagle.org/joseph/2011/01/mw-tutorial
 
-=== Status command ===
+Status command
+==============
 
 `status` Will show whether a file has been added ('A'), locally modified
   ('M') or missing ('!').
 
-=== Pull command ===
+Pull command
+============
 
 The `pull` command has the following features:
 
@@ -54,7 +62,8 @@ The `pull` command has the following features:
 * If the wiki has updates, it will pull those unless they conflict 
   with local changes. The user must then resolve/merge conflicts.
 
-== License ==
+License
+=======
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
